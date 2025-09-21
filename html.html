@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body.dark {
+      background: linear-gradient(135deg, #2c3e50, #34495e); /* Softer dark gradient */
+      color: white;
+    }
+    body.dark h1, 
+    body.dark h2, 
+    body.dark h3, 
+    body.dark h4, 
+    body.dark p {
+      color: white !important; /* Force white text */
+    }
+    body.dark .bg-white {
+      background: #3b3b4f !important; /* Softer gray cards */
+    }
+    body.dark .bg-blue-100, 
+    body.dark .bg-green-100, 
+    body.dark .bg-yellow-100 {
+      background: #4b4b63 !important;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-r from-blue-500 to-cyan-400 min-h-screen flex items-center justify-center p-4 transition duration-500">
+  <div class="w-full max-w-5xl bg-white rounded-2xl shadow-2xl p-6 transition duration-500">
+    
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold text-gray-800">🌍 Weather Dashboard</h1>
+      <div class="flex space-x-2">
+        <p id="liveClock" class="text-lg font-semibold text-gray-700"></p>
+        <button id="themeToggle" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-600">
+          Toggle Dark Mode
+        </button>
+      </div>
+    </div>
+    
+    <!-- Search Bar -->
+    <div class="flex mb-6">
+      <input id="cityInput" type="text" placeholder="Enter city..." 
+        class="flex-grow px-4 py-2 border rounded-l-lg focus:outline-none">
+      <button onclick="getWeather()" 
+        class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-r-lg hover:bg-blue-700">Search</button>
+      <button onclick="getLocationWeather()" 
+        class="ml-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">📍 My Location</button>
+      <button id="toggleTemp" 
+        class="ml-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">Switch °F/°C</button>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="hidden text-center my-4">
+      <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-600 mx-auto"></div>
+      <p class="text-gray-600">Fetching weather...</p>
+    </div>
+
+    <!-- Weather Result -->
+    <div id="weatherResult"></div>
+
+    <!-- Forecast -->
+    <div id="forecastResult" class="mt-6"></div>
+
+    <!-- Chart -->
+    <div class="mt-8">
+      <canvas id="tempChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const apiKey = "35065fd35d174f539a7161908252109";
+    let chartInstance = null;
+    let currentTempC = null; // store Celsius value
+    let isCelsius = true;
+
+    // Fetch Weather
+    async function getWeather(city) {
+      const query = city || document.getElementById("cityInput").value || "India";
+      const url = `https://api.weatherapi.com/v1/forecast.json?key=${apiKey}&q=${query}&days=3&aqi=yes`;
+
+      document.getElementById("loading").classList.remove("hidden");
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        document.getElementById("loading").classList.add("hidden");
+
+        if (data.error) {
+          document.getElementById("weatherResult").innerHTML = 
+            `<p class="text-red-500">❌ ${data.error.message}</p>`;
+          return;
+        }
+
+        currentTempC = data.current.temp_c; // store temp in Celsius
+
+        // Current weather
+        document.getElementById("weatherResult").innerHTML = `
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-gray-800">
+            <div class="p-6 bg-blue-100 rounded-xl shadow text-center">
+              <h2 class="text-xl font-bold">${data.location.name}, ${data.location.country}</h2>
+              <p class="text-sm">Last updated: ${data.current.last_updated}</p>
+              <img src="https:${data.current.condition.icon}" class="w-20 mx-auto my-2">
+              <p id="temperature" data-value="${data.current.temp_c}" class="text-4xl font-bold">${data.current.temp_c}°C</p>
+              <p>${data.current.condition.text}</p>
+            </div>
+            <div class="p-6 bg-green-100 rounded-xl shadow">
+              <h3 class="font-bold mb-2">Details</h3>
+              <p>Feels like: ${data.current.feelslike_c}°C</p>
+              <p>Humidity: ${data.current.humidity}%</p>
+              <p>Wind: ${data.current.wind_kph} kph</p>
+              <p>Visibility: ${data.current.vis_km} km</p>
+              <p>Pressure: ${data.current.pressure_mb} mb</p>
+              <p>Sunrise: ${data.forecast.forecastday[0].astro.sunrise}</p>
+              <p>Sunset: ${data.forecast.forecastday[0].astro.sunset}</p>
+              <p>Air Quality (PM2.5): ${data.current.air_quality.pm2_5.toFixed(1)}</p>
+            </div>
+          </div>
+        `;
+
+        // 3-day forecast
+        let forecastHTML = `<h2 class="text-2xl font-bold my-4">3-Day Forecast</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">`;
+        data.forecast.forecastday.forEach(day => {
+          forecastHTML += `
+            <div class="p-4 bg-yellow-100 rounded-lg shadow text-center">
+              <h4 class="font-semibold">${day.date}</h4>
+              <img src="https:${day.day.condition.icon}" class="w-12 mx-auto">
+              <p class="text-lg">${day.day.avgtemp_c}°C</p>
+              <p>${day.day.condition.text}</p>
+            </div>`;
+        });
+        forecastHTML += `</div>`;
+        document.getElementById("forecastResult").innerHTML = forecastHTML;
+
+        // Chart
+        const labels = data.forecast.forecastday[0].hour.map(h => h.time.split(" ")[1]);
+        const temps = data.forecast.forecastday[0].hour.map(h => h.temp_c);
+
+        const ctx = document.getElementById("tempChart").getContext("2d");
+        if (chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: labels,
+            datasets: [{
+              label: "Temperature (°C)",
+              data: temps,
+              borderColor: "rgba(59,130,246,1)",
+              backgroundColor: "rgba(59,130,246,0.2)",
+              tension: 0.3,
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { labels: { color: document.body.classList.contains("dark") ? "white" : "black" } } },
+            scales: {
+              x: { ticks: { color: document.body.classList.contains("dark") ? "white" : "black" } },
+              y: { ticks: { color: document.body.classList.contains("dark") ? "white" : "black" } }
+            }
+          }
+        });
+
+        // Background based on weather
+        setBackground(data.current.condition.text.toLowerCase());
+
+      } catch (err) {
+        document.getElementById("loading").classList.add("hidden");
+        document.getElementById("weatherResult").innerHTML = 
+          `<p class="text-red-500">⚠️ Failed to fetch weather data</p>`;
+      }
+    }
+
+    // Dynamic background
+    function setBackground(condition) {
+      let body = document.body;
+      if (condition.includes("rain")) {
+        body.style.background = "linear-gradient(to bottom, #283e51, #485563)";
+      } else if (condition.includes("sun") || condition.includes("clear")) {
+        body.style.background = "linear-gradient(to bottom, #f9d423, #ff4e50)";
+      } else {
+        body.style.background = "linear-gradient(to bottom, #232526, #414345)";
+      }
+    }
+
+    // Location support
+    function getLocationWeather() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          getWeather(`${pos.coords.latitude},${pos.coords.longitude}`);
+        });
+      } else {
+        alert("Geolocation not supported.");
+      }
+    }
+
+    // Dark mode toggle
+    document.getElementById("themeToggle").addEventListener("click", () => {
+      document.body.classList.toggle("dark");
+      getWeather(); // refresh chart colors
+    });
+
+    // Temperature toggle
+    document.getElementById("toggleTemp").addEventListener("click", () => {
+      let tempEl = document.getElementById("temperature");
+      if (!tempEl) return;
+
+      let c = parseFloat(tempEl.dataset.value);
+      if (isCelsius) {
+        let f = (c * 9/5) + 32;
+        tempEl.innerText = `${f.toFixed(1)}°F`;
+      } else {
+        tempEl.innerText = `${c}°C`;
+      }
+      isCelsius = !isCelsius;
+    });
+
+    // Live clock
+    function updateClock() {
+      const now = new Date();
+      document.getElementById("liveClock").innerText =
+        now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Auto refresh weather every 5 minutes
+    setInterval(() => {
+      let city = document.getElementById("cityInput").value || "India";
+      getWeather(city);
+    }, 300000);
+
+    // Load India by default
+    getWeather("India");
+  </script>
+</body>
+</html>
