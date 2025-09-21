@@ -38,7 +38,7 @@ Installation & Usage
 
 Clone the repository:
 
-git clone https://github.com/yourusername/weather-dashboard.git
+git clone https://github.com/Girisankarsm/weather_dashboard.git
 
 
 Open index.html in your web browser.
